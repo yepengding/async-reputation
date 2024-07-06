@@ -3,7 +3,7 @@ from logging.logger import Logger
 from simulator.simulator import Simulator
 
 if __name__ == '__main__':
-    logger = Logger("main")
+    logger = Logger("Main")
 
     simulator = Simulator(NODE_NUMBER, EVENT_NUMBER)
 

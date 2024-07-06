@@ -27,8 +27,17 @@ class NodeEvent(Event):
     """
 
     def __init__(self, identifier: int, message: str, node_id: int):
+        """
+        Constructor.
+        :param identifier: event identifier
+        :param message: event message
+        :param node_id: node identifier
+        """
         self._node_id = node_id
         super().__init__(identifier, message)
+
+    def __str__(self):
+        return f'{self._identifier} | {self._message} | {self._node_id}'
 
     @property
     def node_id(self):

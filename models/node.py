@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import threading
 import time
-from queue import Queue
 
 from config import TRANSMISSION_DELAY
 from core.constants import PeerScore
 from logging.logger import Logger
+from models.channel import NodeChannel, EventChannel
 from models.consumer import Consumer
 from models.event import Event, NodeEvent
 
@@ -22,10 +22,9 @@ class Node(threading.Thread):
         self._connected_nodes: [Node] = []
         self._connected_consumers: [Consumer] = []
         self._node_channel: NodeChannel = NodeChannel()
-        self._event_channel: EventChannel = EventChannel()
+        self._event_channel: EventChannel = EventChannel[Event]()
         self._peer_scores: dict[int, int] = {}
         self._terminate: bool = False
-
         self._logger: Logger = Logger(f'Node {self._id}')
         super(Node, self).__init__()
 
@@ -33,8 +32,11 @@ class Node(threading.Thread):
         while not self._terminate:
             if self._event_channel.not_empty():
                 event_received = self._event_channel.get()
+                # Notify consumers
+                self._notify(event_received)
+
                 # Broadcast
-                self.__broadcast(event_received)
+                self._broadcast(event_received)
 
                 # Reevaluate scores of other nodes
                 for n in self._connected_nodes:
@@ -98,7 +100,11 @@ class Node(threading.Thread):
         :return:
         """
 
-    def __broadcast(self, event: Event) -> None:
+    def _notify(self, event: Event) -> None:
+        for c in self._connected_consumers:
+            c.receive(NodeEvent(event.id, event.message, self._id))
+
+    def _broadcast(self, event: Event) -> None:
         """
         Broadcast an event to all connected nodes.
         :param event:
@@ -115,48 +121,3 @@ class Node(threading.Thread):
     @property
     def id(self):
         return self._id
-
-
-class EventChannel:
-    """
-    A class that implements the channel for a node to receive events.
-    """
-
-    def __init__(self):
-        self.__queue = Queue(0)
-
-    def add(self, event: Event):
-        self.__queue.put(event)
-
-    def get(self) -> Event | None:
-        if not self.__queue.empty():
-            return self.__queue.get()
-        else:
-            return None
-
-    def not_empty(self) -> bool:
-        return not self.__queue.empty()
-
-
-class NodeChannel:
-    """
-    A class that implements the channel for a node to receive messages from its connected nodes.
-    """
-
-    def __init__(self):
-        self.__queue = Queue(0)
-        self.__buffer: [NodeEvent] = []
-
-    def add(self, node_id: int, event: Event):
-        self.__queue.put(NodeEvent(event.id, event.message, node_id))
-
-    def remove_node_events_by_event_id(self, event_id: int):
-        self.__buffer = list(filter(lambda e: e.id != event_id, self.__buffer))
-
-    def get_node_events_by_event_id(self, event_id: int) -> [NodeEvent]:
-        self.__load_to_buffer()
-        return list(filter(lambda e: e.id == event_id, self.__buffer))
-
-    def __load_to_buffer(self):
-        while not self.__queue.empty():
-            self.__buffer.append(self.__queue.get())

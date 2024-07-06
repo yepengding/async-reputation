@@ -25,21 +25,24 @@ class Simulator(object):
             n.connect(list(filter(lambda _n: _n.id != n.id, self._nodes)))
 
         # Instantiate an event consumer
-        self._consumer = Consumer(list(map(lambda _n: _n.id, self._nodes)))
+        self._consumer = Consumer(0)
 
         # Connect the consumer to all nodes
-        for n in self._nodes:
-            n.connect_consumer(self._consumer)
+        self._consumer.connect(self._nodes)
 
         self._logger = Logger('Simulator')
 
     def run(self):
         """
-        Start the simulation by starting all nodes.
+        Start the simulation.
         :return:
         """
+        # Start all nodes
         for n in self._nodes:
             n.start()
+
+        # Start consumer
+        self._consumer.start()
 
         self._generate_events()
 
@@ -60,9 +63,14 @@ class Simulator(object):
 
     def stop(self):
         """
-        Stop the simulation by terminating all nodes.
+        Stop the simulation.
         :return:
         """
+        # Terminate nodes
         for n in self._nodes:
             n.terminate()
             n.join()
+
+        # Terminate consumer
+        self._consumer.terminate()
+        self._consumer.join()
