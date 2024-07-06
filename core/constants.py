@@ -1,10 +1,14 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 
-class PeerScore(IntEnum):
-    INITIAL = 0,
-    POSITIVE = 1,
-    NEGATIVE = -1,
+class PerfScore(Enum):
+    DEFAULT: float = 0.5
+
+
+class PeerScore(Enum):
+    DEFAULT: float = 0.5,
+    POSITIVE: float = 1.0,
+    NEGATIVE: float = 0.0,
 
 
 class LogLevel(IntEnum):

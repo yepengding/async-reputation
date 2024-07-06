@@ -7,6 +7,7 @@ from queue import Queue
 from config import TRANSMISSION_DELAY
 from core.constants import PeerScore
 from logging.logger import Logger
+from models.consumer import Consumer
 from models.event import Event, NodeEvent
 
 
@@ -17,43 +18,53 @@ class Node(threading.Thread):
     """
 
     def __init__(self, identifier: int):
-        self.__id: int = identifier
-        self.__connected_nodes: [Node] = []
-        self.__node_channel: NodeChannel = NodeChannel()
-        self.__event_channel: EventChannel = EventChannel()
-        self.__peer_scores: dict[int, int] = {}
+        self._id: int = identifier
+        self._connected_nodes: [Node] = []
+        self._connected_consumers: [Consumer] = []
+        self._node_channel: NodeChannel = NodeChannel()
+        self._event_channel: EventChannel = EventChannel()
+        self._peer_scores: dict[int, int] = {}
+        self._terminate: bool = False
 
-        self.__logger: Logger = Logger(f'Node {self.__id}')
+        self._logger: Logger = Logger(f'Node {self._id}')
         super(Node, self).__init__()
 
     def run(self) -> None:
-        while True:
-            if self.__event_channel.not_empty():
-                event_received = self.__event_channel.get()
+        while not self._terminate:
+            if self._event_channel.not_empty():
+                event_received = self._event_channel.get()
                 # Broadcast
                 self.__broadcast(event_received)
 
                 # Reevaluate scores of other nodes
-                for n in self.__connected_nodes:
-                    self.__peer_scores[n.__id] = PeerScore.INITIAL.value
+                for n in self._connected_nodes:
+                    self._peer_scores[n.id] = PeerScore.DEFAULT.value
                 # Get events from other nodes
-                node_events = self.__node_channel.get_node_events_by_event_id(event_received.id)
+                node_events = self._node_channel.get_node_events_by_event_id(event_received.id)
                 for e in node_events:
-                    self.__peer_scores[e.node_id] = PeerScore.POSITIVE.value \
+                    self._peer_scores[e.node_id] = PeerScore.POSITIVE.value \
                         if e.message == event_received.message else PeerScore.NEGATIVE.value
 
                 # Consume processed events
-                self.__node_channel.remove_node_events_by_event_id(event_received.id)
+                self._node_channel.remove_node_events_by_event_id(event_received.id)
 
     def connect(self, nodes: [Node]) -> None:
         """
-        Connects to the connected nodes.
+        Connects to the other nodes.
         :param nodes:
         :return:
         """
-        self.__connected_nodes = nodes
-        for n in self.__connected_nodes:
-            self.__peer_scores[n.__id] = PeerScore.INITIAL.value
+        self._connected_nodes = nodes
+        for n in self._connected_nodes:
+            self._peer_scores[n.id] = PeerScore.DEFAULT.value
+
+    def connect_consumer(self, consumer: Consumer) -> None:
+        """
+        Connects to the given consumer.
+        :param consumer:
+        :return:
+        """
+        self._connected_consumers.append(consumer)
 
     def receive(self, event: Event) -> None:
         """
@@ -62,8 +73,8 @@ class Node(threading.Thread):
         :return:
         """
         time.sleep(TRANSMISSION_DELAY)
-        self.__event_channel.add(event)
-        self.__logger.debug(f"Event ({event}) received")
+        self._event_channel.add(event)
+        self._logger.debug(f"Event ({event}) received")
 
     def receive_from(self, node_id: int, event: Event) -> None:
         """
@@ -73,8 +84,19 @@ class Node(threading.Thread):
         :return:
         """
         time.sleep(TRANSMISSION_DELAY)
-        self.__node_channel.add(node_id, event)
-        self.__logger.debug(f"Event ({event}) received from node {node_id}")
+        self._node_channel.add(node_id, event)
+        self._logger.debug(f"Event ({event}) received from node {node_id}")
+
+    def terminate(self) -> None:
+        self._terminate = True
+        self._logger.debug(f"{self._id} is terminating")
+
+    def __push(self, event: Event) -> None:
+        """
+        Push an event to all connected consumers.
+        :param event:
+        :return:
+        """
 
     def __broadcast(self, event: Event) -> None:
         """
@@ -82,17 +104,17 @@ class Node(threading.Thread):
         :param event:
         :return:
         """
-        for n in self.__connected_nodes:
-            n.receive_from(self.__id, event)
-        self.__logger.debug(f"Broadcast ({event}) ")
+        for n in self._connected_nodes:
+            n.receive_from(self._id, event)
+        self._logger.debug(f"Broadcast ({event})")
 
     @property
     def peer_scores(self) -> dict[int, int]:
-        return self.__peer_scores
+        return self._peer_scores
 
     @property
     def id(self):
-        return self.__id
+        return self._id
 
 
 class EventChannel:
