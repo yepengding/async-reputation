@@ -1,10 +1,12 @@
-from enum import Enum, auto
-from typing import Final
-
-INIT_SCORE: Final[int] = 0
-POSITIVE_FEEDBACK_SCORE: Final[int] = 1
+from enum import IntEnum
 
 
-class LogLevel(Enum):
-    DEBUG = auto()
-    INFO = auto()
+class PeerScore(IntEnum):
+    INITIAL = 0,
+    POSITIVE = 1,
+    NEGATIVE = -1,
+
+
+class LogLevel(IntEnum):
+    INFO = 1
+    DEBUG = 2

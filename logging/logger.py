@@ -1,4 +1,5 @@
 import config
+from core.constants import LogLevel
 
 
 class Logger(object):
@@ -12,10 +13,12 @@ class Logger(object):
         self.__level = config.LOG_LEVEL
 
     def debug(self, message: str):
-        print(f'{ConsoleColor.OKCYAN}DEBUG - {self.__name}: {message}{ConsoleColor.ENDC}')
+        if self.__level >= LogLevel.DEBUG:
+            print(f'{ConsoleColor.OKCYAN}DEBUG - {self.__name}: {message}{ConsoleColor.ENDC}')
 
     def info(self, message: object):
-        print(f'{ConsoleColor.OKBLUE}INFO - {self.__name}: {str(message)}{ConsoleColor.ENDC}')
+        if self.__level >= LogLevel.INFO:
+            print(f'{ConsoleColor.OKBLUE}INFO - {self.__name}: {str(message)}{ConsoleColor.ENDC}')
 
 
 class ConsoleColor:

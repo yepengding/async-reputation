@@ -5,7 +5,7 @@ import time
 from queue import Queue
 
 from config import TRANSMISSION_DELAY
-from core.constants import INIT_SCORE, POSITIVE_FEEDBACK_SCORE
+from core.constants import PeerScore
 from logging.logger import Logger
 from models.event import Event, NodeEvent
 
@@ -21,7 +21,7 @@ class Node(threading.Thread):
         self.__connected_nodes: [Node] = []
         self.__node_channel: NodeChannel = NodeChannel()
         self.__event_channel: EventChannel = EventChannel()
-        self.__scores: dict[int, int] = {}
+        self.__peer_scores: dict[int, int] = {}
 
         self.__logger: Logger = Logger(f'Node {self.__id}')
         super(Node, self).__init__()
@@ -35,11 +35,12 @@ class Node(threading.Thread):
 
                 # Reevaluate scores of other nodes
                 for n in self.__connected_nodes:
-                    self.__scores[n.__id] = INIT_SCORE
+                    self.__peer_scores[n.__id] = PeerScore.INITIAL.value
                 # Get events from other nodes
                 node_events = self.__node_channel.get_node_events_by_event_id(event_received.id)
                 for e in node_events:
-                    self.__scores[e.node_id] = POSITIVE_FEEDBACK_SCORE
+                    self.__peer_scores[e.node_id] = PeerScore.POSITIVE.value \
+                        if e.message == event_received.message else PeerScore.NEGATIVE.value
 
                 # Consume processed events
                 self.__node_channel.remove_node_events_by_event_id(event_received.id)
@@ -52,7 +53,7 @@ class Node(threading.Thread):
         """
         self.__connected_nodes = nodes
         for n in self.__connected_nodes:
-            self.__scores[n.__id] = INIT_SCORE
+            self.__peer_scores[n.__id] = PeerScore.INITIAL.value
 
     def receive(self, event: Event) -> None:
         """
@@ -75,10 +76,6 @@ class Node(threading.Thread):
         self.__node_channel.add(node_id, event)
         self.__logger.debug(f"Event ({event}) received from node {node_id}")
 
-    @property
-    def get_score_metrics(self) -> dict[int, int]:
-        return self.__scores
-
     def __broadcast(self, event: Event) -> None:
         """
         Broadcast an event to all connected nodes.
@@ -90,11 +87,18 @@ class Node(threading.Thread):
         self.__logger.debug(f"Broadcast ({event}) ")
 
     @property
+    def peer_scores(self) -> dict[int, int]:
+        return self.__peer_scores
+
+    @property
     def id(self):
         return self.__id
 
 
 class EventChannel:
+    """
+    A class that implements the channel for a node to receive events.
+    """
 
     def __init__(self):
         self.__queue = Queue(0)
@@ -113,6 +117,9 @@ class EventChannel:
 
 
 class NodeChannel:
+    """
+    A class that implements the channel for a node to receive messages from its connected nodes.
+    """
 
     def __init__(self):
         self.__queue = Queue(0)

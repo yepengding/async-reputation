@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
         logger.info([n.id for n in nodes])
         for n in nodes:
-            logger.info(n.get_score_metrics)
+            logger.info(n.peer_scores)
 
     for n in nodes:
         n.join()
